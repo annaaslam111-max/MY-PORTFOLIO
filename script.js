@@ -92,11 +92,17 @@
     navToggle.setAttribute('aria-expanded', String(open));
     document.body.classList.toggle('nav-open', open);
   });
-  navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+
+  const navClose = document.getElementById('nav-close');
+  function closeMobileNav() {
     navLinks.classList.remove('open');
     navToggle.classList.remove('open');
+    navToggle.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('nav-open');
-  }));
+  }
+  if (navClose) navClose.addEventListener('click', closeMobileNav);
+
+  navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileNav));
 
   /* ---------------------------------------------------------------------
      HERO — entrance reveal
