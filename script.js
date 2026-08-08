@@ -118,29 +118,29 @@
   }
 
   /* ---------------------------------------------------------------------
-     HERO 3D BACKGROUND (Three.js)
+     SITE-WIDE 3D BACKGROUND (Three.js)
      --------------------------------------------------------------------- */
   function sizeCanvas(canvas) {
     canvas.width = canvas.offsetWidth * devicePixelRatio;
     canvas.height = canvas.offsetHeight * devicePixelRatio;
   }
 
-  const heroCanvas = document.getElementById('hero-3d');
-  if (heroCanvas && window.THREE) {
-    const heroEl = document.getElementById('hero');
+  const bgCanvas = document.getElementById('bg-3d');
+  if (bgCanvas && window.THREE) {
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(55, heroEl.clientWidth / heroEl.clientHeight, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100);
     camera.position.z = 9;
 
-    const renderer = new THREE.WebGLRenderer({ canvas: heroCanvas, alpha: true, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ canvas: bgCanvas, alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setSize(heroEl.clientWidth, heroEl.clientHeight);
+    renderer.setSize(innerWidth, innerHeight);
 
     const rig = new THREE.Group();
     scene.add(rig);
 
-    /* Silver point cloud, distributed on a shell around the origin */
-    const particleCount = isTouch ? 500 : 900;
+    /* Silver point cloud, distributed on a shell around the origin.
+       Kept light so it reads as a subtle ambient backdrop across the whole page. */
+    const particleCount = isTouch ? 320 : 600;
     const positions = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount; i++) {
       const radius = 5 + Math.random() * 3;
@@ -153,57 +153,56 @@
     const particleGeo = new THREE.BufferGeometry();
     particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const particleMat = new THREE.PointsMaterial({
-      color: 0xe6e6eb, size: 0.045, transparent: true, opacity: 0.55,
+      color: 0xe6e6eb, size: 0.04, transparent: true, opacity: 0.35,
       sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false
     });
     const particleField = new THREE.Points(particleGeo, particleMat);
     rig.add(particleField);
 
-    /* Two nested wireframe icosahedra for a subtle "premium tech" hero object */
+    /* Two nested wireframe icosahedra, very faint, for depth */
     const outerWire = new THREE.Mesh(
       new THREE.IcosahedronGeometry(4.4, 1),
-      new THREE.MeshBasicMaterial({ color: 0xb9bcc2, wireframe: true, transparent: true, opacity: 0.16 })
+      new THREE.MeshBasicMaterial({ color: 0xb9bcc2, wireframe: true, transparent: true, opacity: 0.09 })
     );
     rig.add(outerWire);
 
     const innerWire = new THREE.Mesh(
       new THREE.IcosahedronGeometry(2.6, 0),
-      new THREE.MeshBasicMaterial({ color: 0xe7e6e1, wireframe: true, transparent: true, opacity: 0.1 })
+      new THREE.MeshBasicMaterial({ color: 0xe7e6e1, wireframe: true, transparent: true, opacity: 0.06 })
     );
     rig.add(innerWire);
 
     let targetRotX = 0, targetRotY = 0;
 
-    function onHeroResize() {
-      const w = heroEl.clientWidth, h = heroEl.clientHeight;
-      camera.aspect = w / h;
+    function onBgResize() {
+      camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      renderer.setSize(innerWidth, innerHeight);
     }
-    window.addEventListener('resize', onHeroResize);
+    window.addEventListener('resize', onBgResize);
 
     if (!isTouch) {
       window.addEventListener('mousemove', (e) => {
         const mx = (e.clientX / innerWidth) * 2 - 1;
         const my = (e.clientY / innerHeight) * 2 - 1;
-        targetRotY = mx * 0.35;
-        targetRotX = my * 0.2;
+        targetRotY = mx * 0.2;
+        targetRotX = my * 0.12;
       });
     }
 
-    function animateHero3D() {
-      requestAnimationFrame(animateHero3D);
+    function animateBg3D() {
+      requestAnimationFrame(animateBg3D);
       if (!reducedMotion) {
-        particleField.rotation.y += 0.0009;
-        outerWire.rotation.y += 0.0012;
-        outerWire.rotation.x += 0.0004;
-        innerWire.rotation.y -= 0.0016;
+        particleField.rotation.y += 0.0006;
+        outerWire.rotation.y += 0.0008;
+        outerWire.rotation.x += 0.0003;
+        innerWire.rotation.y -= 0.001;
       }
       rig.rotation.y += (targetRotY - rig.rotation.y) * 0.04;
       rig.rotation.x += (targetRotX - rig.rotation.x) * 0.04;
       renderer.render(scene, camera);
     }
-    animateHero3D();
+    animateBg3D();
   }
 
   /* ---------------------------------------------------------------------
