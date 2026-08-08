@@ -118,63 +118,92 @@
   }
 
   /* ---------------------------------------------------------------------
-     HERO PARTICLE FIELD (canvas)
+     HERO 3D BACKGROUND (Three.js)
      --------------------------------------------------------------------- */
-  const pCanvas = document.getElementById('particle-canvas');
-  const pCtx = pCanvas.getContext('2d');
-  let particles = [];
-  let pMouse = { x: -9999, y: -9999 };
-
   function sizeCanvas(canvas) {
     canvas.width = canvas.offsetWidth * devicePixelRatio;
     canvas.height = canvas.offsetHeight * devicePixelRatio;
   }
 
-  function initParticles() {
-    sizeCanvas(pCanvas);
-    const count = Math.min(140, Math.floor((pCanvas.width * pCanvas.height) / 26000));
-    particles = Array.from({ length: count }, () => ({
-      x: Math.random() * pCanvas.width,
-      y: Math.random() * pCanvas.height,
-      r: Math.random() * 1.4 + 0.4,
-      vx: (Math.random() - 0.5) * 0.15,
-      vy: (Math.random() - 0.5) * 0.15,
-      baseAlpha: Math.random() * 0.35 + 0.08
-    }));
-  }
+  const heroCanvas = document.getElementById('hero-3d');
+  if (heroCanvas && window.THREE) {
+    const heroEl = document.getElementById('hero');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(55, heroEl.clientWidth / heroEl.clientHeight, 0.1, 100);
+    camera.position.z = 9;
 
-  function drawParticles() {
-    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-    const mx = pMouse.x * devicePixelRatio, my = pMouse.y * devicePixelRatio;
+    const renderer = new THREE.WebGLRenderer({ canvas: heroCanvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(heroEl.clientWidth, heroEl.clientHeight);
 
-    particles.forEach(p => {
-      p.x += p.vx; p.y += p.vy;
-      if (p.x < 0) p.x = pCanvas.width; if (p.x > pCanvas.width) p.x = 0;
-      if (p.y < 0) p.y = pCanvas.height; if (p.y > pCanvas.height) p.y = 0;
+    const rig = new THREE.Group();
+    scene.add(rig);
 
-      const d = Math.hypot(p.x - mx, p.y - my);
-      const boost = d < 180 * devicePixelRatio ? (1 - d / (180 * devicePixelRatio)) * 0.7 : 0;
-      const alpha = Math.min(1, p.baseAlpha + boost);
-
-      pCtx.beginPath();
-      pCtx.arc(p.x, p.y, p.r * devicePixelRatio, 0, Math.PI * 2);
-      pCtx.fillStyle = `rgba(235,235,240,${alpha})`;
-      pCtx.fill();
+    /* Silver point cloud, distributed on a shell around the origin */
+    const particleCount = isTouch ? 500 : 900;
+    const positions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      const radius = 5 + Math.random() * 3;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = radius * Math.cos(phi);
+    }
+    const particleGeo = new THREE.BufferGeometry();
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const particleMat = new THREE.PointsMaterial({
+      color: 0xe6e6eb, size: 0.045, transparent: true, opacity: 0.55,
+      sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false
     });
+    const particleField = new THREE.Points(particleGeo, particleMat);
+    rig.add(particleField);
 
-    requestAnimationFrame(drawParticles);
-  }
+    /* Two nested wireframe icosahedra for a subtle "premium tech" hero object */
+    const outerWire = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(4.4, 1),
+      new THREE.MeshBasicMaterial({ color: 0xb9bcc2, wireframe: true, transparent: true, opacity: 0.16 })
+    );
+    rig.add(outerWire);
 
-  if (pCanvas) {
-    initParticles();
-    if (!reducedMotion) drawParticles();
-    else { drawParticles(); } // draw once effectively via first frame; static field is fine
-    window.addEventListener('resize', initParticles);
-    window.addEventListener('mousemove', (e) => {
-      const rect = pCanvas.getBoundingClientRect();
-      pMouse.x = e.clientX - rect.left;
-      pMouse.y = e.clientY - rect.top;
-    });
+    const innerWire = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(2.6, 0),
+      new THREE.MeshBasicMaterial({ color: 0xe7e6e1, wireframe: true, transparent: true, opacity: 0.1 })
+    );
+    rig.add(innerWire);
+
+    let targetRotX = 0, targetRotY = 0;
+
+    function onHeroResize() {
+      const w = heroEl.clientWidth, h = heroEl.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', onHeroResize);
+
+    if (!isTouch) {
+      window.addEventListener('mousemove', (e) => {
+        const mx = (e.clientX / innerWidth) * 2 - 1;
+        const my = (e.clientY / innerHeight) * 2 - 1;
+        targetRotY = mx * 0.35;
+        targetRotX = my * 0.2;
+      });
+    }
+
+    function animateHero3D() {
+      requestAnimationFrame(animateHero3D);
+      if (!reducedMotion) {
+        particleField.rotation.y += 0.0009;
+        outerWire.rotation.y += 0.0012;
+        outerWire.rotation.x += 0.0004;
+        innerWire.rotation.y -= 0.0016;
+      }
+      rig.rotation.y += (targetRotY - rig.rotation.y) * 0.04;
+      rig.rotation.x += (targetRotX - rig.rotation.x) * 0.04;
+      renderer.render(scene, camera);
+    }
+    animateHero3D();
   }
 
   /* ---------------------------------------------------------------------
